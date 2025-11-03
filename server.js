@@ -18,9 +18,7 @@ const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 // OAuth Configuration
 const CLIENT_ID = process.env.CLIENT_ID || 'demo-client-id';
 const CLIENT_SECRET = process.env.CLIENT_SECRET || 'demo-client-secret';
-const AUTHORIZATION_URL = process.env.AUTHORIZATION_URL || 'https://idporten-ver2.difi.no/idporten-oidc-provider/authorize';
-const TOKEN_URL = process.env.TOKEN_URL || 'https://idporten-ver2.difi.no/idporten-oidc-provider/token';
-const USERINFO_URL = process.env.USERINFO_URL || 'https://idporten-ver2.difi.no/idporten-oidc-provider/userinfo';
+const IDPORTEN_DISCOVERY_URL = process.env.IDPORTEN_DISCOVERY_URL || 'https://test.idporten.no/.well-known/openid-configuration';
 const ALTINN_PLATFORM_URL = process.env.ALTINN_PLATFORM_URL || 'https://platform.altinn.no';
 const ALTINN_ORG = process.env.ALTINN_ORG || '';
 const ALTINN_APP_NAME = process.env.ALTINN_APP_NAME || '';
@@ -28,6 +26,13 @@ const ALTINN_APP_API_URL = ALTINN_ORG && ALTINN_APP_NAME
   ? `https://${ALTINN_ORG}.apps.altinn.no/${ALTINN_ORG}/${ALTINN_APP_NAME}`
   : null;
 const OAUTH_SCOPES = process.env.OAUTH_SCOPES || 'openid profile altinn:instances.read';
+
+// OpenID Connect configuration (will be populated from discovery endpoint)
+let oidcConfig = {
+  authorization_endpoint: null,
+  token_endpoint: null,
+  userinfo_endpoint: null
+};
 
 // In-memory storage for logs (in production, use a database)
 const requestLogs = [];
@@ -78,6 +83,53 @@ function logRequest(type, url, method, headers, body, response, status, timestam
   return logEntry;
 }
 
+// Function to fetch OpenID Connect configuration from discovery endpoint
+async function fetchOidcConfig() {
+  if (oidcConfig.authorization_endpoint && oidcConfig.token_endpoint && oidcConfig.userinfo_endpoint) {
+    return oidcConfig; // Already fetched
+  }
+  
+  try {
+    console.log(`Fetching OpenID Connect configuration from ${IDPORTEN_DISCOVERY_URL}`);
+    const response = await axios.get(IDPORTEN_DISCOVERY_URL, {
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    oidcConfig = {
+      authorization_endpoint: response.data.authorization_endpoint,
+      token_endpoint: response.data.token_endpoint,
+      userinfo_endpoint: response.data.userinfo_endpoint,
+      issuer: response.data.issuer,
+      jwks_uri: response.data.jwks_uri
+    };
+    
+    console.log('OpenID Connect configuration loaded successfully');
+    console.log(`  Authorization endpoint: ${oidcConfig.authorization_endpoint}`);
+    console.log(`  Token endpoint: ${oidcConfig.token_endpoint}`);
+    console.log(`  Userinfo endpoint: ${oidcConfig.userinfo_endpoint}`);
+    
+    // Log the discovery request
+    logRequest('outgoing', IDPORTEN_DISCOVERY_URL, 'GET', {}, null, response.data, response.status, new Date().toISOString());
+    
+    return oidcConfig;
+  } catch (error) {
+    console.error('Error fetching OpenID Connect configuration:', error.message);
+    if (error.response) {
+      logRequest('outgoing', IDPORTEN_DISCOVERY_URL, 'GET', {}, null, 
+        error.response.data || { error: error.message }, error.response.status, new Date().toISOString());
+    }
+    throw error;
+  }
+}
+
+// Initialize OIDC configuration on startup
+fetchOidcConfig().catch(err => {
+  console.error('Failed to fetch OIDC configuration on startup. Will retry on first use.');
+  console.error(err.message);
+});
+
 // Helper function to make logged API calls
 async function makeLoggedRequest(config) {
   const startTime = Date.now();
@@ -114,28 +166,44 @@ app.post('/api/logs/clear', (req, res) => {
 });
 
 // Login - redirect to ID-porten
-app.get('/auth/login', (req, res) => {
-  const state = Math.random().toString(36).substring(7);
-  const nonce = Math.random().toString(36).substring(7);
-  
-  req.session.oauthState = state;
-  req.session.oauthNonce = nonce;
-  
-  const redirectUri = `${BASE_URL}/auth/callback`;
-  const params = new URLSearchParams({
-    client_id: CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: OAUTH_SCOPES,
-    state: state,
-    nonce: nonce
-  });
-  
-  const authUrl = `${AUTHORIZATION_URL}?${params.toString()}`;
-  
-  logRequest('outgoing', authUrl, 'GET', {}, null, null, null, new Date().toISOString());
-  
-  res.redirect(authUrl);
+app.get('/auth/login', async (req, res) => {
+  try {
+    // Ensure OIDC configuration is loaded
+    const config = await fetchOidcConfig();
+    
+    if (!config.authorization_endpoint) {
+      return res.status(500).json({ 
+        error: 'OpenID Connect configuration not available. Check server logs.' 
+      });
+    }
+    
+    const state = Math.random().toString(36).substring(7);
+    const nonce = Math.random().toString(36).substring(7);
+    
+    req.session.oauthState = state;
+    req.session.oauthNonce = nonce;
+    
+    const redirectUri = `${BASE_URL}/auth/callback`;
+    const params = new URLSearchParams({
+      client_id: CLIENT_ID,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: OAUTH_SCOPES,
+      state: state,
+      nonce: nonce
+    });
+    
+    const authUrl = `${config.authorization_endpoint}?${params.toString()}`;
+    
+    logRequest('outgoing', authUrl, 'GET', {}, null, null, null, new Date().toISOString());
+    
+    res.redirect(authUrl);
+  } catch (error) {
+    console.error('Error in /auth/login:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to initialize authentication. Please check server logs.' 
+    });
+  }
 });
 
 // OAuth callback
@@ -159,10 +227,17 @@ app.get('/auth/callback', async (req, res) => {
   }
   
   try {
+    // Ensure OIDC configuration is loaded
+    const config = await fetchOidcConfig();
+    
+    if (!config.token_endpoint) {
+      return res.redirect('/?error=oidc_config_not_available');
+    }
+    
     // Exchange authorization code for access token
     const tokenResponse = await makeLoggedRequest({
       method: 'POST',
-      url: TOKEN_URL,
+      url: config.token_endpoint,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
@@ -184,18 +259,20 @@ app.get('/auth/callback', async (req, res) => {
     req.session.tokenExpiresAt = Date.now() + (expires_in * 1000);
     
     // Get user info
-    try {
-      const userInfoResponse = await makeLoggedRequest({
-        method: 'GET',
-        url: USERINFO_URL,
-        headers: {
-          'Authorization': `Bearer ${access_token}`
-        }
-      });
-      
-      req.session.userInfo = userInfoResponse.data;
-    } catch (err) {
-      console.error('Error fetching user info:', err.message);
+    if (config.userinfo_endpoint) {
+      try {
+        const userInfoResponse = await makeLoggedRequest({
+          method: 'GET',
+          url: config.userinfo_endpoint,
+          headers: {
+            'Authorization': `Bearer ${access_token}`
+          }
+        });
+        
+        req.session.userInfo = userInfoResponse.data;
+      } catch (err) {
+        console.error('Error fetching user info:', err.message);
+      }
     }
     
     res.redirect('/?success=true');
@@ -527,7 +604,8 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Altinn Auth Demo Server running on http://localhost:${PORT}`);
-  console.log(`\nNote: Configure your .env file with actual OAuth credentials`);
-  console.log(`For testing, the app will use demo endpoints but authentication will fail without real credentials.\n`);
+  console.log(`\nOpenID Connect Discovery URL: ${IDPORTEN_DISCOVERY_URL}`);
+  console.log(`Note: Configure your .env file with actual OAuth credentials (CLIENT_ID, CLIENT_SECRET)`);
+  console.log(`The application will automatically discover ID-porten endpoints from the discovery URL.\n`);
 });
 

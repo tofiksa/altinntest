@@ -124,4 +124,6 @@ Updated the application to match the official [Altinn Studio API documentation](
 - App API requires organization and app name configuration
 - Storage API provides cross-app instance access, while App API is app-specific
 - Always follow official documentation structure for better maintainability
+- Use OpenID Connect discovery endpoint for automatic endpoint configuration
+- ID-porten test environment: `https://test.idporten.no/.well-known/openid-configuration`
 

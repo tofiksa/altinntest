@@ -36,9 +36,11 @@ Create a `.env` file in the root directory (copy from `.env.example`):
 ```env
 CLIENT_ID=your-client-id-here
 CLIENT_SECRET=your-client-secret-here
-AUTHORIZATION_URL=https://idporten-ver2.difi.no/idporten-oidc-provider/authorize
-TOKEN_URL=https://idporten-ver2.difi.no/idporten-oidc-provider/token
-USERINFO_URL=https://idporten-ver2.difi.no/idporten-oidc-provider/userinfo
+
+# ID-porten OpenID Connect Discovery
+# The application automatically discovers authorization, token, and userinfo endpoints
+IDPORTEN_DISCOVERY_URL=https://test.idporten.no/.well-known/openid-configuration
+
 ALTINN_PLATFORM_URL=https://platform.altinn.no
 
 # Optional: For App API endpoints
@@ -88,8 +90,9 @@ OAUTH_SCOPES=openid profile altinn:instances.read altinn:apps.read
       - [ID-porten Documentation](https://docs.altinn.studio/dialogporten/user-guides/authenticating/)
    
    **Note for Testing**: 
-   - Make sure you're using the correct environment (VER2 for testing)
-   - For production, use the production endpoints
+   - The application uses OpenID Connect discovery to automatically find ID-porten endpoints
+   - Default discovery URL: `https://test.idporten.no/.well-known/openid-configuration`
+   - For production, change `IDPORTEN_DISCOVERY_URL` to the production discovery endpoint
    - The redirect URI must be registered in the portal before authentication will work
 
 4. **Start the server**:
