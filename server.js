@@ -5,6 +5,7 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -130,6 +131,24 @@ fetchOidcConfig().catch(err => {
   console.error(err.message);
 });
 
+// Helper function to generate PKCE code_verifier and code_challenge
+function generatePKCE() {
+  // Generate a random code_verifier (43-128 characters, URL-safe)
+  // Using 96 characters (32 bytes * 3/2 base64 encoding) for good entropy
+  const codeVerifier = crypto.randomBytes(32).toString('base64url');
+  
+  // Generate code_challenge by SHA256 hashing the verifier and base64url encoding
+  const codeChallenge = crypto
+    .createHash('sha256')
+    .update(codeVerifier)
+    .digest('base64url');
+  
+  return {
+    codeVerifier,
+    codeChallenge
+  };
+}
+
 // Helper function to make logged API calls
 async function makeLoggedRequest(config) {
   const startTime = Date.now();
@@ -177,11 +196,16 @@ app.get('/auth/login', async (req, res) => {
       });
     }
     
+    // Generate PKCE values
+    const { codeVerifier, codeChallenge } = generatePKCE();
+    
     const state = Math.random().toString(36).substring(7);
     const nonce = Math.random().toString(36).substring(7);
     
+    // Store OAuth state, nonce, and PKCE verifier in session
     req.session.oauthState = state;
     req.session.oauthNonce = nonce;
+    req.session.codeVerifier = codeVerifier;
     
     const redirectUri = `${BASE_URL}/auth/callback`;
     const params = new URLSearchParams({
@@ -190,7 +214,9 @@ app.get('/auth/login', async (req, res) => {
       response_type: 'code',
       scope: OAUTH_SCOPES,
       state: state,
-      nonce: nonce
+      nonce: nonce,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256'
     });
     
     const authUrl = `${config.authorization_endpoint}?${params.toString()}`;
@@ -226,6 +252,11 @@ app.get('/auth/callback', async (req, res) => {
     return res.redirect('/?error=no_code');
   }
   
+  // Verify PKCE code_verifier is in session
+  if (!req.session.codeVerifier) {
+    return res.redirect('/?error=missing_pkce_verifier');
+  }
+  
   try {
     // Ensure OIDC configuration is loaded
     const config = await fetchOidcConfig();
@@ -234,21 +265,27 @@ app.get('/auth/callback', async (req, res) => {
       return res.redirect('/?error=oidc_config_not_available');
     }
     
-    // Exchange authorization code for access token
+    // Exchange authorization code for access token (with PKCE)
+    const tokenParams = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: code,
+      redirect_uri: `${BASE_URL}/auth/callback`,
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      code_verifier: req.session.codeVerifier
+    });
+    
     const tokenResponse = await makeLoggedRequest({
       method: 'POST',
       url: config.token_endpoint,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      data: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: `${BASE_URL}/auth/callback`,
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET
-      }).toString()
+      data: tokenParams.toString()
     });
+    
+    // Clear PKCE verifier from session after successful token exchange
+    delete req.session.codeVerifier;
     
     const { access_token, refresh_token, id_token, expires_in } = tokenResponse.data;
     

@@ -126,4 +126,8 @@ Updated the application to match the official [Altinn Studio API documentation](
 - Always follow official documentation structure for better maintainability
 - Use OpenID Connect discovery endpoint for automatic endpoint configuration
 - ID-porten test environment: `https://test.idporten.no/.well-known/openid-configuration`
+- ID-porten requires PKCE (Proof Key for Code Exchange) with S256 method
+- PKCE implementation: generate code_verifier (32 random bytes, base64url), SHA256 hash for code_challenge
+- Include code_challenge and code_challenge_method (S256) in authorization request
+- Include code_verifier in token exchange request
 

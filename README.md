@@ -4,7 +4,7 @@ A simple web application that demonstrates Altinn 3 authentication flow using ID
 
 ## Features
 
-- **OAuth 2.0 Authentication**: Implements ID-porten OAuth flow for user authentication
+- **OAuth 2.0 Authentication with PKCE**: Implements ID-porten OAuth flow with PKCE (Proof Key for Code Exchange) using S256 method for enhanced security
 - **Request/Response Logging**: Visualizes all HTTP traffic between:
   - Frontend and backend
   - Backend and ID-porten (OAuth provider)
