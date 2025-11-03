@@ -97,9 +97,31 @@ From the documentation:
 
 ## Executor's Feedback or Assistance Requests
 
-_No blockers yet - waiting to start execution_
+### Update: Application Aligned with Altinn Studio API Documentation
+
+Updated the application to match the official [Altinn Studio API documentation](https://docs.altinn.studio/nb/api/):
+
+**Changes Made:**
+1. ✅ Restructured API endpoints to distinguish between Platform API and App API
+2. ✅ Added Storage API endpoints: instances, data elements, events
+3. ✅ Added App API endpoints: metadata, instances (requires org/appname config)
+4. ✅ Updated environment configuration to support App API org/appname structure
+5. ✅ Updated UI to organize APIs by type (Platform API, Storage API, App API)
+6. ✅ Updated README with proper API documentation references
+
+**API Structure:**
+- **Platform API** (`https://platform.altinn.no`): Profile, Storage endpoints
+- **App API** (`https://{org}.apps.altinn.no/{org}/{appname}`): App-specific endpoints
+- **Storage API**: Access instances across all applications
+
+**Configuration:**
+- Added `ALTINN_ORG` and `ALTINN_APP_NAME` environment variables for App API support
+- Legacy endpoints maintained for backward compatibility
 
 ## Lessons
 
-_No lessons yet_
+- Altinn Studio API documentation clearly separates Platform API and App API
+- App API requires organization and app name configuration
+- Storage API provides cross-app instance access, while App API is app-specific
+- Always follow official documentation structure for better maintainability
 

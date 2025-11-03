@@ -9,8 +9,11 @@ A simple web application that demonstrates Altinn 3 authentication flow using ID
   - Frontend and backend
   - Backend and ID-porten (OAuth provider)
   - Backend and Altinn Platform APIs
+  - Backend and Altinn App APIs
 - **Real-time Log Viewer**: See authentication flow in real-time with detailed request/response information
-- **Altinn API Integration**: Example API calls to Altinn services (Profile, Instances)
+- **Altinn API Integration**: Example API calls to Altinn services following the [Altinn Studio API documentation](https://docs.altinn.studio/nb/api/):
+  - **Platform API**: Profile, Storage (instances, data elements, events)
+  - **App API**: App metadata, app instances (requires org/appname configuration)
 
 ## Prerequisites
 
@@ -37,6 +40,12 @@ AUTHORIZATION_URL=https://idporten-ver2.difi.no/idporten-oidc-provider/authorize
 TOKEN_URL=https://idporten-ver2.difi.no/idporten-oidc-provider/token
 USERINFO_URL=https://idporten-ver2.difi.no/idporten-oidc-provider/userinfo
 ALTINN_PLATFORM_URL=https://platform.altinn.no
+
+# Optional: For App API endpoints
+# Format: https://{org}.apps.altinn.no/{org}/{appname}
+ALTINN_ORG=your-org-name
+ALTINN_APP_NAME=your-app-name
+
 PORT=3000
 SESSION_SECRET=your-secret-key-change-in-production
 BASE_URL=http://localhost:3000
@@ -107,7 +116,10 @@ Navigate to `http://localhost:3000`
    - Token exchange request
    - User info request
    - Any subsequent Altinn API calls
-5. Click **"Get Profile"** or **"Get Instances"** to test Altinn API integration
+5. Test Altinn API integration:
+   - **Platform API**: Get Profile, Get All Instances
+   - **Storage API**: Get Instance by ID, Get Data Elements, Get Instance Events (requires instance ID)
+   - **App API**: Get App Metadata, Get App Instances (requires ALTINN_ORG and ALTINN_APP_NAME configuration)
 
 ## Architecture
 
@@ -116,12 +128,37 @@ Navigate to `http://localhost:3000`
 - Session management
 - API request logging middleware
 - Proxy for Altinn API calls
+- **Platform API endpoints**: `/api/platform/*` (Profile, Storage)
+- **App API endpoints**: `/api/app/*` (Metadata, Instances) - requires org/appname config
 
 ### Frontend (Vanilla JS)
-- User interface
+- User interface with organized API groups
 - Real-time log visualization
 - Request interceptors (for frontend logging)
 - Auto-refreshing log viewer
+- Input fields for instance-specific operations
+
+## API Endpoints
+
+### Platform API
+The application implements endpoints that match the [Altinn Studio Platform API](https://docs.altinn.studio/nb/api/):
+
+- **Profile API**: `GET /api/platform/profile` → `https://platform.altinn.no/profile/api/v1/user`
+- **Storage API**:
+  - `GET /api/platform/storage/instances` → Get all instances across apps
+  - `GET /api/platform/storage/instances/:instanceId` → Get specific instance
+  - `GET /api/platform/storage/instances/:instanceId/dataelements` → Get data elements
+  - `GET /api/platform/storage/instances/:instanceId/events` → Get instance events
+
+### App API
+App-specific endpoints following the [App API pattern](https://docs.altinn.studio/nb/api/):
+
+- **App Metadata**: `GET /api/app/metadata` → `https://{org}.apps.altinn.no/{org}/{appname}/metadata`
+- **App Instances**: 
+  - `GET /api/app/instances` → Get instances for the configured app
+  - `POST /api/app/instances` → Create a new instance
+
+**Note**: App API endpoints require `ALTINN_ORG` and `ALTINN_APP_NAME` to be configured in `.env`.
 
 ## Request/Response Logging
 
@@ -150,10 +187,14 @@ Sensitive information (tokens, cookies) is automatically redacted from logs.
 
 ## Altinn API Documentation
 
-For more information about Altinn APIs:
-- [Altinn API Documentation](https://docs.altinn.studio/nb/api/)
-- [Authentication Guide](https://docs.altinn.studio/nb/api/authentication/)
-- [ID-porten Integration](https://docs.altinn.studio/dialogporten/user-guides/authenticating/)
+This application follows the [Altinn Studio API documentation](https://docs.altinn.studio/nb/api/):
+
+- **Main API Documentation**: [Altinn 3 API](https://docs.altinn.studio/nb/api/)
+- **Platform API**: Base URL `https://platform.altinn.no` - includes Storage, Profile, Authentication APIs
+- **App API**: Pattern `https://{org}.apps.altinn.no/{org}/{appname}` - app-specific endpoints
+- **Authentication Guide**: [Authentication API](https://docs.altinn.studio/nb/api/authentication/)
+- **ID-porten Integration**: [Dialogporten User Guides](https://docs.altinn.studio/dialogporten/user-guides/authenticating/)
+- **Storage API**: [Storage API Documentation](https://docs.altinn.studio/nb/api/storage/)
 
 ## Troubleshooting
 

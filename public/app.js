@@ -48,7 +48,13 @@ const statusText = document.getElementById('status-text');
 const userInfo = document.getElementById('user-info');
 const userData = document.getElementById('user-data');
 const testProfileBtn = document.getElementById('test-profile-btn');
-const testInstancesBtn = document.getElementById('test-instances-btn');
+const testStorageInstancesBtn = document.getElementById('test-storage-instances-btn');
+const testStorageInstanceBtn = document.getElementById('test-storage-instance-btn');
+const testStorageDataelementsBtn = document.getElementById('test-storage-dataelements-btn');
+const testStorageEventsBtn = document.getElementById('test-storage-events-btn');
+const testAppMetadataBtn = document.getElementById('test-app-metadata-btn');
+const testAppInstancesBtn = document.getElementById('test-app-instances-btn');
+const instanceIdInput = document.getElementById('instance-id-input');
 const apiResponse = document.getElementById('api-response');
 const apiResponseData = document.getElementById('api-response-data');
 const logsContainer = document.getElementById('logs-container');
@@ -65,12 +71,50 @@ logoutBtn.addEventListener('click', () => {
     window.location.href = '/auth/logout';
 });
 
+// Platform API
 testProfileBtn.addEventListener('click', async () => {
-    await testApiCall('/api/altinn/profile');
+    await testApiCall('/api/platform/profile');
 });
 
-testInstancesBtn.addEventListener('click', async () => {
-    await testApiCall('/api/altinn/instances');
+testStorageInstancesBtn.addEventListener('click', async () => {
+    await testApiCall('/api/platform/storage/instances');
+});
+
+// Storage API
+testStorageInstanceBtn.addEventListener('click', async () => {
+    const instanceId = instanceIdInput.value.trim();
+    if (!instanceId) {
+        alert('Please enter an instance ID');
+        return;
+    }
+    await testApiCall(`/api/platform/storage/instances/${encodeURIComponent(instanceId)}`);
+});
+
+testStorageDataelementsBtn.addEventListener('click', async () => {
+    const instanceId = instanceIdInput.value.trim();
+    if (!instanceId) {
+        alert('Please enter an instance ID');
+        return;
+    }
+    await testApiCall(`/api/platform/storage/instances/${encodeURIComponent(instanceId)}/dataelements`);
+});
+
+testStorageEventsBtn.addEventListener('click', async () => {
+    const instanceId = instanceIdInput.value.trim();
+    if (!instanceId) {
+        alert('Please enter an instance ID');
+        return;
+    }
+    await testApiCall(`/api/platform/storage/instances/${encodeURIComponent(instanceId)}/events`);
+});
+
+// App API
+testAppMetadataBtn.addEventListener('click', async () => {
+    await testApiCall('/api/app/metadata');
+});
+
+testAppInstancesBtn.addEventListener('click', async () => {
+    await testApiCall('/api/app/instances');
 });
 
 refreshLogsBtn.addEventListener('click', () => {
@@ -120,8 +164,20 @@ function updateUI(authenticated, userInfo = null) {
         statusText.textContent = 'Authenticated';
         loginBtn.style.display = 'none';
         logoutBtn.style.display = 'inline-block';
+        
+        // Enable Platform API buttons
         testProfileBtn.disabled = false;
-        testInstancesBtn.disabled = false;
+        testStorageInstancesBtn.disabled = false;
+        
+        // Enable Storage API buttons
+        testStorageInstanceBtn.disabled = false;
+        testStorageDataelementsBtn.disabled = false;
+        testStorageEventsBtn.disabled = false;
+        instanceIdInput.disabled = false;
+        
+        // Enable App API buttons
+        testAppMetadataBtn.disabled = false;
+        testAppInstancesBtn.disabled = false;
         
         if (userInfo) {
             userInfo.style.display = 'block';
@@ -132,8 +188,21 @@ function updateUI(authenticated, userInfo = null) {
         statusText.textContent = 'Not authenticated';
         loginBtn.style.display = 'inline-block';
         logoutBtn.style.display = 'none';
+        
+        // Disable Platform API buttons
         testProfileBtn.disabled = true;
-        testInstancesBtn.disabled = true;
+        testStorageInstancesBtn.disabled = true;
+        
+        // Disable Storage API buttons
+        testStorageInstanceBtn.disabled = true;
+        testStorageDataelementsBtn.disabled = true;
+        testStorageEventsBtn.disabled = true;
+        instanceIdInput.disabled = true;
+        
+        // Disable App API buttons
+        testAppMetadataBtn.disabled = true;
+        testAppInstancesBtn.disabled = true;
+        
         userInfo.style.display = 'none';
     }
 }

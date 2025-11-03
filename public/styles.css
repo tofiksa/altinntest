@@ -158,10 +158,51 @@ header h1 {
     font-size: 12px;
 }
 
+.api-group {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.api-group:last-child {
+    border-bottom: none;
+}
+
+.api-group h3 {
+    color: var(--primary-color);
+    margin-bottom: 5px;
+    font-size: 18px;
+}
+
+.api-description {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-bottom: 15px;
+}
+
 .action-buttons {
     display: flex;
     gap: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.input-group {
+    margin-top: 10px;
+}
+
+.input-group input {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.input-group input:disabled {
+    background: var(--background);
+    cursor: not-allowed;
 }
 
 .api-response {

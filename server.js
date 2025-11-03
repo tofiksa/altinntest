@@ -22,6 +22,11 @@ const AUTHORIZATION_URL = process.env.AUTHORIZATION_URL || 'https://idporten-ver
 const TOKEN_URL = process.env.TOKEN_URL || 'https://idporten-ver2.difi.no/idporten-oidc-provider/token';
 const USERINFO_URL = process.env.USERINFO_URL || 'https://idporten-ver2.difi.no/idporten-oidc-provider/userinfo';
 const ALTINN_PLATFORM_URL = process.env.ALTINN_PLATFORM_URL || 'https://platform.altinn.no';
+const ALTINN_ORG = process.env.ALTINN_ORG || '';
+const ALTINN_APP_NAME = process.env.ALTINN_APP_NAME || '';
+const ALTINN_APP_API_URL = ALTINN_ORG && ALTINN_APP_NAME 
+  ? `https://${ALTINN_ORG}.apps.altinn.no/${ALTINN_ORG}/${ALTINN_APP_NAME}`
+  : null;
 const OAUTH_SCOPES = process.env.OAUTH_SCOPES || 'openid profile altinn:instances.read';
 
 // In-memory storage for logs (in production, use a database)
@@ -213,14 +218,17 @@ app.get('/api/user', (req, res) => {
   });
 });
 
-// Test Altinn API call
-app.get('/api/altinn/profile', async (req, res) => {
+// ============================================
+// Platform API Endpoints
+// ============================================
+
+// Profile API - Get user profile
+app.get('/api/platform/profile', async (req, res) => {
   if (!req.session.accessToken) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
   
   try {
-    // Example: Get user profile from Altinn
     const response = await makeLoggedRequest({
       method: 'GET',
       url: `${ALTINN_PLATFORM_URL}/profile/api/v1/user`,
@@ -238,13 +246,20 @@ app.get('/api/altinn/profile', async (req, res) => {
   }
 });
 
-// Test Altinn instances API (if available)
-app.get('/api/altinn/instances', async (req, res) => {
+// Storage API - Get instances (across all apps)
+app.get('/api/platform/storage/instances', async (req, res) => {
   if (!req.session.accessToken) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
   
   try {
+    const params = {};
+    if (req.query.instanceOwnerPartyId) {
+      params.instanceOwnerPartyId = req.query.instanceOwnerPartyId;
+    } else if (req.session.userInfo?.pid) {
+      params.instanceOwnerPartyId = req.session.userInfo.pid;
+    }
+    
     const response = await makeLoggedRequest({
       method: 'GET',
       url: `${ALTINN_PLATFORM_URL}/storage/api/v1/instances`,
@@ -252,9 +267,239 @@ app.get('/api/altinn/instances', async (req, res) => {
         'Authorization': `Bearer ${req.session.accessToken}`,
         'Accept': 'application/json'
       },
-      params: {
-        instanceOwnerPartyId: req.session.userInfo?.pid || ''
+      params
+    });
+    
+    res.json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
+
+// Storage API - Get instance by ID
+app.get('/api/platform/storage/instances/:instanceId', async (req, res) => {
+  if (!req.session.accessToken) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  
+  try {
+    const { instanceId } = req.params;
+    const response = await makeLoggedRequest({
+      method: 'GET',
+      url: `${ALTINN_PLATFORM_URL}/storage/api/v1/instances/${instanceId}`,
+      headers: {
+        'Authorization': `Bearer ${req.session.accessToken}`,
+        'Accept': 'application/json'
       }
+    });
+    
+    res.json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
+
+// Storage API - Get data elements for an instance
+app.get('/api/platform/storage/instances/:instanceId/dataelements', async (req, res) => {
+  if (!req.session.accessToken) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  
+  try {
+    const { instanceId } = req.params;
+    const response = await makeLoggedRequest({
+      method: 'GET',
+      url: `${ALTINN_PLATFORM_URL}/storage/api/v1/instances/${instanceId}/dataelements`,
+      headers: {
+        'Authorization': `Bearer ${req.session.accessToken}`,
+        'Accept': 'application/json'
+      }
+    });
+    
+    res.json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
+
+// Storage API - Get instance events
+app.get('/api/platform/storage/instances/:instanceId/events', async (req, res) => {
+  if (!req.session.accessToken) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  
+  try {
+    const { instanceId } = req.params;
+    const response = await makeLoggedRequest({
+      method: 'GET',
+      url: `${ALTINN_PLATFORM_URL}/storage/api/v1/instances/${instanceId}/events`,
+      headers: {
+        'Authorization': `Bearer ${req.session.accessToken}`,
+        'Accept': 'application/json'
+      }
+    });
+    
+    res.json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
+
+// ============================================
+// App API Endpoints (if configured)
+// ============================================
+
+// App API - Get app metadata
+app.get('/api/app/metadata', async (req, res) => {
+  if (!req.session.accessToken) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  
+  if (!ALTINN_APP_API_URL) {
+    return res.status(400).json({ 
+      error: 'App API not configured. Set ALTINN_ORG and ALTINN_APP_NAME in .env' 
+    });
+  }
+  
+  try {
+    const response = await makeLoggedRequest({
+      method: 'GET',
+      url: `${ALTINN_APP_API_URL}/metadata`,
+      headers: {
+        'Authorization': `Bearer ${req.session.accessToken}`,
+        'Accept': 'application/json'
+      }
+    });
+    
+    res.json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
+
+// App API - Get instances for this app
+app.get('/api/app/instances', async (req, res) => {
+  if (!req.session.accessToken) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  
+  if (!ALTINN_APP_API_URL) {
+    return res.status(400).json({ 
+      error: 'App API not configured. Set ALTINN_ORG and ALTINN_APP_NAME in .env' 
+    });
+  }
+  
+  try {
+    const params = {};
+    if (req.query.instanceOwnerPartyId) {
+      params.instanceOwnerPartyId = req.query.instanceOwnerPartyId;
+    }
+    
+    const response = await makeLoggedRequest({
+      method: 'GET',
+      url: `${ALTINN_APP_API_URL}/instances`,
+      headers: {
+        'Authorization': `Bearer ${req.session.accessToken}`,
+        'Accept': 'application/json'
+      },
+      params
+    });
+    
+    res.json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
+
+// App API - Create instance
+app.post('/api/app/instances', async (req, res) => {
+  if (!req.session.accessToken) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  
+  if (!ALTINN_APP_API_URL) {
+    return res.status(400).json({ 
+      error: 'App API not configured. Set ALTINN_ORG and ALTINN_APP_NAME in .env' 
+    });
+  }
+  
+  try {
+    const response = await makeLoggedRequest({
+      method: 'POST',
+      url: `${ALTINN_APP_API_URL}/instances`,
+      headers: {
+        'Authorization': `Bearer ${req.session.accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      data: req.body
+    });
+    
+    res.json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
+
+// Legacy endpoints for backward compatibility
+app.get('/api/altinn/profile', async (req, res) => {
+  if (!req.session.accessToken) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  
+  try {
+    const response = await makeLoggedRequest({
+      method: 'GET',
+      url: `${ALTINN_PLATFORM_URL}/profile/api/v1/user`,
+      headers: {
+        'Authorization': `Bearer ${req.session.accessToken}`,
+        'Accept': 'application/json'
+      }
+    });
+    
+    res.json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
+
+app.get('/api/altinn/instances', async (req, res) => {
+  if (!req.session.accessToken) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  
+  try {
+    const params = {};
+    if (req.query.instanceOwnerPartyId) {
+      params.instanceOwnerPartyId = req.query.instanceOwnerPartyId;
+    } else if (req.session.userInfo?.pid) {
+      params.instanceOwnerPartyId = req.session.userInfo.pid;
+    }
+    
+    const response = await makeLoggedRequest({
+      method: 'GET',
+      url: `${ALTINN_PLATFORM_URL}/storage/api/v1/instances`,
+      headers: {
+        'Authorization': `Bearer ${req.session.accessToken}`,
+        'Accept': 'application/json'
+      },
+      params
     });
     
     res.json(response.data);
