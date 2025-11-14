@@ -43,9 +43,12 @@ let isAuthenticated = false;
 // DOM Elements
 const loginBtn = document.getElementById('login-btn');
 const logoutBtn = document.getElementById('logout-btn');
+const viewUserInfoBtn = document.getElementById('view-user-info-btn');
+const refreshUserInfoBtn = document.getElementById('refresh-user-info-btn');
 const statusIndicator = document.getElementById('status-indicator');
 const statusText = document.getElementById('status-text');
 const userInfo = document.getElementById('user-info');
+const userInfoSummary = document.getElementById('user-info-summary');
 const userData = document.getElementById('user-data');
 const testProfileBtn = document.getElementById('test-profile-btn');
 const testStorageInstancesBtn = document.getElementById('test-storage-instances-btn');
@@ -69,6 +72,14 @@ loginBtn.addEventListener('click', () => {
 
 logoutBtn.addEventListener('click', () => {
     window.location.href = '/auth/logout';
+});
+
+viewUserInfoBtn.addEventListener('click', () => {
+    displayUserInformation();
+});
+
+refreshUserInfoBtn.addEventListener('click', () => {
+    displayUserInformation();
 });
 
 // Platform API
@@ -147,7 +158,7 @@ async function checkAuthStatus() {
         if (response.ok) {
             const data = await response.json();
             isAuthenticated = true;
-            updateUI(true, data.userInfo);
+            updateUI(true, data.userInfo, data.authorizationDetails, data.idTokenClaims);
         } else {
             isAuthenticated = false;
             updateUI(false);
@@ -158,12 +169,208 @@ async function checkAuthStatus() {
     }
 }
 
-function updateUI(authenticated, userInfo = null) {
+// Function to extract and format organization numbers from authorization details
+function extractOrganizationNumbers(authorizationDetails) {
+    const orgNumbers = [];
+    
+    if (!authorizationDetails || !Array.isArray(authorizationDetails)) {
+        return orgNumbers;
+    }
+    
+    // Helper function to extract org number from various formats
+    function extractOrgNumber(orgnoValue) {
+        if (!orgnoValue) return null;
+        
+        let orgno = orgnoValue;
+        // Handle object format { authority: "...", ID: "0192:314758625" }
+        if (typeof orgnoValue === 'object' && orgnoValue.ID) {
+            orgno = orgnoValue.ID;
+        }
+        
+        if (!orgno) return null;
+        
+        // Handle ISO6523 format: "0192:314758625" or just "314758625"
+        if (typeof orgno === 'string') {
+            // If it contains a colon, extract the part after the colon
+            if (orgno.includes(':')) {
+                const parts = orgno.split(':');
+                return parts[parts.length - 1]; // Get the last part after the colon
+            }
+            // If it's just digits, return as is
+            if (/^\d+$/.test(orgno)) {
+                return orgno;
+            }
+        }
+        
+        return null;
+    }
+    
+    authorizationDetails.forEach(authDetail => {
+        // Check for orgno in the detail itself (ansattporten:orgno type)
+        if (authDetail.orgno) {
+            const orgno = extractOrgNumber(authDetail.orgno);
+            if (orgno) {
+                orgNumbers.push({
+                    orgno: orgno,
+                    type: authDetail.type,
+                    fullId: typeof authDetail.orgno === 'object' ? authDetail.orgno.ID : authDetail.orgno
+                });
+            }
+        }
+        
+        // Check for authorized_parties (for altinn:resource and altinn:service types)
+        if (authDetail.authorized_parties && Array.isArray(authDetail.authorized_parties)) {
+            authDetail.authorized_parties.forEach(party => {
+                if (party.orgno) {
+                    const orgno = extractOrgNumber(party.orgno);
+                    if (orgno) {
+                        orgNumbers.push({
+                            orgno: orgno,
+                            type: authDetail.type,
+                            resource: authDetail.resource || party.resource,
+                            resourceName: authDetail.resource_name || party.name,
+                            unitType: party.unit_type,
+                            fullId: typeof party.orgno === 'object' ? party.orgno.ID : party.orgno
+                        });
+                    }
+                }
+            });
+        }
+    });
+    
+    return orgNumbers;
+}
+
+// Function to display user information with formatted organization numbers
+async function displayUserInformation() {
+    try {
+        const response = await fetch('/api/user');
+        if (!response.ok) {
+            throw new Error('Failed to fetch user information');
+        }
+        
+        const data = await response.json();
+        
+        // Show the user info section
+        userInfo.style.display = 'block';
+        
+        // Build comprehensive user data object
+        const displayData = {
+            userInfo: data.userInfo || null,
+            authorizationDetails: data.authorizationDetails || null,
+            idTokenClaims: data.idTokenClaims || null
+        };
+        
+        // Extract organization numbers
+        const orgNumbers = extractOrganizationNumbers(data.authorizationDetails);
+        
+        // Build formatted summary
+        let summaryHTML = '<div class="user-info-content">';
+        
+        // Basic user info
+        if (data.userInfo) {
+            summaryHTML += '<div class="info-section"><h3>Basic Information</h3>';
+            if (data.userInfo.sub) summaryHTML += `<p><strong>Subject:</strong> ${escapeHtml(data.userInfo.sub)}</p>`;
+            if (data.userInfo.name) summaryHTML += `<p><strong>Name:</strong> ${escapeHtml(data.userInfo.name)}</p>`;
+            if (data.userInfo.email) summaryHTML += `<p><strong>Email:</strong> ${escapeHtml(data.userInfo.email)}</p>`;
+            if (data.userInfo.pid) summaryHTML += `<p><strong>PID:</strong> ${escapeHtml(data.userInfo.pid)}</p>`;
+            summaryHTML += '</div>';
+        }
+        
+        // Organization numbers
+        if (orgNumbers.length > 0) {
+            summaryHTML += '<div class="info-section"><h3>Organization Numbers</h3>';
+            summaryHTML += '<div class="org-numbers-list">';
+            
+            // Group by organization number to avoid duplicates
+            const uniqueOrgs = {};
+            orgNumbers.forEach(org => {
+                if (!uniqueOrgs[org.orgno]) {
+                    uniqueOrgs[org.orgno] = [];
+                }
+                uniqueOrgs[org.orgno].push(org);
+            });
+            
+            Object.keys(uniqueOrgs).forEach(orgno => {
+                const orgs = uniqueOrgs[orgno];
+                summaryHTML += `<div class="org-number-item">`;
+                summaryHTML += `<div class="org-number-badge">${escapeHtml(orgno)}</div>`;
+                summaryHTML += '<div class="org-details">';
+                orgs.forEach(org => {
+                    if (org.resourceName) {
+                        summaryHTML += `<p><strong>Resource:</strong> ${escapeHtml(org.resourceName)}</p>`;
+                    }
+                    if (org.unitType) {
+                        summaryHTML += `<p><strong>Type:</strong> ${escapeHtml(org.unitType)}</p>`;
+                    }
+                    if (org.type) {
+                        summaryHTML += `<p><strong>Authorization Type:</strong> ${escapeHtml(org.type)}</p>`;
+                    }
+                });
+                summaryHTML += '</div></div>';
+            });
+            
+            summaryHTML += '</div></div>';
+        } else if (data.authorizationDetails) {
+            summaryHTML += '<div class="info-section"><h3>Organization Numbers</h3>';
+            summaryHTML += '<p class="no-data">No organization numbers found in authorization details.</p>';
+            summaryHTML += '</div>';
+        }
+        
+        // Authorization details summary
+        if (data.authorizationDetails && Array.isArray(data.authorizationDetails)) {
+            summaryHTML += '<div class="info-section"><h3>Authorization Details</h3>';
+            summaryHTML += `<p><strong>Number of authorizations:</strong> ${data.authorizationDetails.length}</p>`;
+            data.authorizationDetails.forEach((auth, index) => {
+                summaryHTML += `<div class="auth-detail-item">`;
+                summaryHTML += `<p><strong>Type ${index + 1}:</strong> ${escapeHtml(auth.type || 'N/A')}</p>`;
+                if (auth.resource) {
+                    summaryHTML += `<p><strong>Resource:</strong> ${escapeHtml(auth.resource)}</p>`;
+                }
+                if (auth.resource_name) {
+                    summaryHTML += `<p><strong>Resource Name:</strong> ${escapeHtml(auth.resource_name)}</p>`;
+                }
+                if (auth.authorized_parties && auth.authorized_parties.length > 0) {
+                    summaryHTML += `<p><strong>Authorized Parties:</strong> ${auth.authorized_parties.length}</p>`;
+                }
+                summaryHTML += `</div>`;
+            });
+            summaryHTML += '</div>';
+        }
+        
+        // ID Token Claims summary
+        if (data.idTokenClaims) {
+            summaryHTML += '<div class="info-section"><h3>ID Token Claims</h3>';
+            if (data.idTokenClaims.sub) summaryHTML += `<p><strong>Subject:</strong> ${escapeHtml(data.idTokenClaims.sub)}</p>`;
+            if (data.idTokenClaims.iss) summaryHTML += `<p><strong>Issuer:</strong> ${escapeHtml(data.idTokenClaims.iss)}</p>`;
+            if (data.idTokenClaims.aud) summaryHTML += `<p><strong>Audience:</strong> ${escapeHtml(Array.isArray(data.idTokenClaims.aud) ? data.idTokenClaims.aud.join(', ') : data.idTokenClaims.aud)}</p>`;
+            if (data.idTokenClaims.exp) {
+                const expDate = new Date(data.idTokenClaims.exp * 1000);
+                summaryHTML += `<p><strong>Expires:</strong> ${expDate.toLocaleString()}</p>`;
+            }
+            summaryHTML += '</div>';
+        }
+        
+        summaryHTML += '</div>';
+        
+        // Update the summary and full data
+        userInfoSummary.innerHTML = summaryHTML;
+        userData.textContent = JSON.stringify(displayData, null, 2);
+        
+    } catch (error) {
+        console.error('Error fetching user information:', error);
+        userInfo.style.display = 'block';
+        userInfoSummary.innerHTML = `<p class="error">Error loading user information: ${escapeHtml(error.message)}</p>`;
+    }
+}
+
+function updateUI(authenticated, userInfoData = null, authorizationDetails = null, idTokenClaims = null) {
     if (authenticated) {
         statusIndicator.classList.add('authenticated');
         statusText.textContent = 'Authenticated';
         loginBtn.style.display = 'none';
         logoutBtn.style.display = 'inline-block';
+        viewUserInfoBtn.style.display = 'inline-block';
         
         // Enable Platform API buttons
         testProfileBtn.disabled = false;
@@ -179,15 +386,51 @@ function updateUI(authenticated, userInfo = null) {
         testAppMetadataBtn.disabled = false;
         testAppInstancesBtn.disabled = false;
         
-        if (userInfo) {
+        // Build comprehensive user data object with RAR authorization_details
+        const displayData = {
+            userInfo: userInfoData || null,
+            authorizationDetails: authorizationDetails || null,
+            idTokenClaims: idTokenClaims || null
+        };
+        
+        // Display user info if available
+        if (userInfoData || authorizationDetails || idTokenClaims) {
             userInfo.style.display = 'block';
-            userData.textContent = JSON.stringify(userInfo, null, 2);
+            userData.textContent = JSON.stringify(displayData, null, 2);
+            
+            // Also update the summary
+            const orgNumbers = extractOrganizationNumbers(authorizationDetails);
+            let summaryHTML = '<div class="user-info-content">';
+            
+            if (orgNumbers.length > 0) {
+                summaryHTML += '<div class="info-section"><h3>Organization Numbers</h3>';
+                summaryHTML += '<div class="org-numbers-list">';
+                const uniqueOrgs = {};
+                orgNumbers.forEach(org => {
+                    if (!uniqueOrgs[org.orgno]) {
+                        uniqueOrgs[org.orgno] = org;
+                    }
+                });
+                Object.keys(uniqueOrgs).forEach(orgno => {
+                    summaryHTML += `<div class="org-number-badge">${escapeHtml(orgno)}</div>`;
+                });
+                summaryHTML += '</div></div>';
+            }
+            
+            summaryHTML += '</div>';
+            userInfoSummary.innerHTML = summaryHTML;
+        } else {
+            // Show user info section but indicate data is not available
+            userInfo.style.display = 'block';
+            userData.textContent = 'User information not available. It may still be loading or there was an error fetching it.';
+            userInfoSummary.innerHTML = '<p class="no-data">Click "View My Information" to refresh.</p>';
         }
     } else {
         statusIndicator.classList.remove('authenticated');
         statusText.textContent = 'Not authenticated';
         loginBtn.style.display = 'inline-block';
         logoutBtn.style.display = 'none';
+        viewUserInfoBtn.style.display = 'none';
         
         // Disable Platform API buttons
         testProfileBtn.disabled = true;
@@ -349,5 +592,38 @@ if (urlParams.has('success')) {
 }
 if (urlParams.has('error')) {
     alert('Authentication error: ' + urlParams.get('error'));
+}
+
+// Check if we're coming from logout - clear any cached state
+if (urlParams.has('logout') || document.referrer.includes('/auth/logout')) {
+    // Reset all frontend state
+    isAuthenticated = false;
+    
+    // Clear all UI elements
+    if (userInfoSummary) {
+        userInfoSummary.innerHTML = '';
+    }
+    if (userData) {
+        userData.textContent = '';
+    }
+    if (apiResponseData) {
+        apiResponseData.textContent = '';
+    }
+    if (userInfo) {
+        userInfo.style.display = 'none';
+    }
+    
+    // Update UI to show logged out state
+    updateUI(false);
+    
+    // Clear URL parameters
+    if (window.history.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    
+    // Force a fresh auth status check
+    setTimeout(() => {
+        checkAuthStatus();
+    }, 100);
 }
 

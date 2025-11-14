@@ -410,3 +410,147 @@ header h1 {
     background: var(--text-secondary);
 }
 
+/* User Info Styles */
+.user-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.user-info-summary {
+    margin-bottom: 20px;
+}
+
+.user-info-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.info-section {
+    background: var(--background);
+    padding: 15px;
+    border-radius: 4px;
+    border-left: 4px solid var(--primary-color);
+}
+
+.info-section h3 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.info-section p {
+    margin: 5px 0;
+    color: var(--text);
+}
+
+.info-section strong {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.org-numbers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.org-number-item {
+    background: var(--surface);
+    padding: 15px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+}
+
+.org-number-badge {
+    background: var(--primary-color);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 16px;
+    font-family: 'Courier New', monospace;
+    min-width: 120px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.org-details {
+    flex: 1;
+}
+
+.org-details p {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+.auth-detail-item {
+    background: var(--surface);
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 10px;
+    border-left: 3px solid var(--warning-color);
+}
+
+.auth-detail-item p {
+    margin: 3px 0;
+    font-size: 13px;
+}
+
+.no-data {
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 10px;
+}
+
+.error {
+    color: var(--danger-color);
+    padding: 10px;
+    background: #FFEBEE;
+    border-radius: 4px;
+    border-left: 4px solid var(--danger-color);
+}
+
+.btn-info {
+    background: #00ACC1;
+    color: white;
+}
+
+details {
+    margin-top: 15px;
+}
+
+details summary {
+    cursor: pointer;
+    color: var(--primary-color);
+    font-weight: 500;
+    padding: 10px;
+    background: var(--background);
+    border-radius: 4px;
+    user-select: none;
+}
+
+details summary:hover {
+    background: #E3F2FD;
+}
+
+details[open] summary {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    margin-bottom: 0;
+}
+
+details pre {
+    margin-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+

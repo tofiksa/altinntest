@@ -21,12 +21,20 @@
             <div class="auth-buttons" id="auth-buttons">
                 <button id="login-btn" class="btn btn-primary">Login with ID-porten</button>
                 <button id="logout-btn" class="btn btn-secondary" style="display: none;">Logout</button>
+                <button id="view-user-info-btn" class="btn btn-info" style="display: none;">View My Information</button>
             </div>
         </div>
 
         <div id="user-info" class="user-info" style="display: none;">
-            <h2>User Information</h2>
-            <pre id="user-data"></pre>
+            <div class="user-info-header">
+                <h2>User Information</h2>
+                <button id="refresh-user-info-btn" class="btn btn-small">Refresh</button>
+            </div>
+            <div id="user-info-summary" class="user-info-summary"></div>
+            <details>
+                <summary>View Full Details (JSON)</summary>
+                <pre id="user-data"></pre>
+            </details>
         </div>
 
         <div class="actions-section">
