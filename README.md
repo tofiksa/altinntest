@@ -31,7 +31,7 @@ npm install
 ```
 
 2. **Configure environment variables**:
-Create a `.env` file in the root directory (copy from `.env.example`):
+Create a `.env.local` file in the root directory (copy from `env.example`):
 
 ```env
 CLIENT_ID=your-client-id-here
@@ -95,14 +95,15 @@ OAUTH_SCOPES=openid profile altinn:instances.read altinn:apps.read
    - For production, change `IDPORTEN_DISCOVERY_URL` to the production discovery endpoint
    - The redirect URI must be registered in the portal before authentication will work
 
-4. **Start the server**:
-```bash
-npm start
-```
-
-Or for development with auto-reload:
+4. **Start the development server**:
 ```bash
 npm run dev
+```
+
+Or for production build:
+```bash
+npm run build
+npm start
 ```
 
 5. **Open in browser**:
@@ -126,18 +127,21 @@ Navigate to `http://localhost:3000`
 
 ## Architecture
 
-### Backend (Express.js)
-- OAuth flow implementation
-- Session management
-- API request logging middleware
+### Backend (Next.js API Routes)
+- OAuth flow implementation with Next.js route handlers
+- Session management using cookies
+- API request logging utilities
 - Proxy for Altinn API calls
 - **Platform API endpoints**: `/api/platform/*` (Profile, Storage)
 - **App API endpoints**: `/api/app/*` (Metadata, Instances) - requires org/appname config
+- **Auth routes**: `/auth/login`, `/auth/callback`, `/auth/logout`
 
-### Frontend (Vanilla JS)
+### Frontend (Next.js with React)
+- Built with Next.js App Router
+- React components using shadcn/ui
+- Tailwind CSS for styling
 - User interface with organized API groups
 - Real-time log visualization
-- Request interceptors (for frontend logging)
 - Auto-refreshing log viewer
 - Input fields for instance-specific operations
 

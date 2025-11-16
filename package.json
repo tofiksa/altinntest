@@ -2,11 +2,11 @@
   "name": "altinn-auth-demo",
   "version": "1.0.0",
   "description": "Demo application showing Altinn authentication flow with request/response logging",
-  "main": "server.js",
-  "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "keywords": [
     "altinn",
@@ -17,11 +17,29 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@radix-ui/react-slot": "^1.2.4",
     "axios": "^1.13.2",
-    "cookie-parser": "^1.4.7",
-    "dotenv": "^16.6.1",
-    "express": "^4.21.2",
-    "express-session": "^1.18.2",
-    "jsonwebtoken": "^9.0.2"
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cookie": "^0.6.0",
+    "dotenv": "^16.4.5",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.553.0",
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "devDependencies": {
+    "@types/cookie": "^0.6.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.14.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.5.0"
   }
 }
